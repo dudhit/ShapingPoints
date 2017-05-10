@@ -5,14 +5,13 @@ namespace SoloProjects.Dudhit.Utilities
 {
   public class BresenhamEllipticalCurve
   {
-  
+
     private long xAxis, yAxis, xChange, yChange, ellipseError, aSquare, bSquare, twoASquare, twoBSquare, stoppingX, stoppingY;
     private int xRadius, yRadius;
     private HashSet<Point> storePoints;
 
     public BresenhamEllipticalCurve(int xR, int yR)
     {
-
       if(xR <= 0 || yR <= 0) { throw new System.ArgumentException(string.Format("Each ellipse radius {0} & {1} must be greater than 0", xR, yR), "xRadius"); }
       storePoints = new HashSet<Point>();
       this.xRadius = xR;
@@ -31,19 +30,15 @@ namespace SoloProjects.Dudhit.Utilities
 
     private void setOne()
     {
-
       xAxis = xRadius;
       yAxis = 0;
       xChange = bSquare * (1 - (2 * xRadius));
       yChange = aSquare;
-
       ellipseError = 0;
       stoppingX = twoBSquare * xRadius;
       stoppingY = 0;
       while(stoppingX >= stoppingY)
       {
-
-    
         Point tempPoint = new Point((int)xAxis, (int)yAxis);
         if(!storePoints.Contains(tempPoint))
           storePoints.Add(tempPoint);
@@ -58,10 +53,7 @@ namespace SoloProjects.Dudhit.Utilities
           stoppingX -= twoBSquare;
           ellipseError += xChange;
           xChange += twoBSquare;
-
-      }
-
-    
+        }
       }
     }
 
@@ -71,7 +63,6 @@ namespace SoloProjects.Dudhit.Utilities
       yAxis = yRadius;
       xChange = bSquare;
       yChange = aSquare * (1 - (2 * yRadius));
-
       ellipseError = 0;
       stoppingX = 0;
       stoppingY = twoASquare * yRadius;
@@ -80,7 +71,6 @@ namespace SoloProjects.Dudhit.Utilities
         Point tempPoint = new Point((int)xAxis, (int)yAxis);
         if(!storePoints.Contains(tempPoint))
           storePoints.Add(tempPoint);
-    
         xAxis++;
         stoppingX += twoBSquare;
         ellipseError += xChange;
@@ -92,8 +82,7 @@ namespace SoloProjects.Dudhit.Utilities
           ellipseError += yChange;
           yChange += twoASquare;
         }
-     }
-
+      }
     }
 
     public HashSet<Point> GetCurve()

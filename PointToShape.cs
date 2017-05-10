@@ -53,7 +53,7 @@ namespace SoloProjects.Dudhit.Utilities
     /// 
     /// </summary>
     /// <returns></returns>
-    private  void DetermineProcessingPaths()
+    private void DetermineProcessingPaths()
     {
       switch(this.shape)
       {//  quartercircle 17 x
@@ -164,7 +164,7 @@ namespace SoloProjects.Dudhit.Utilities
           }
 
       }
-       }
+    }
     /// <summary>
     /// 
     /// </summary>
@@ -202,6 +202,16 @@ namespace SoloProjects.Dudhit.Utilities
                       LineAlongPlaneGenerator(0, xx, "x", (int)solidP.X, (int)solidP.Y);
                     });
               }
+              else
+              {
+                Parallel.ForEach(yz.GetCurve(), solidP =>
+                {
+                  if((int)xx-1>-1)
+                  {
+                    LineAlongPlaneGenerator(xx-1, xx, "x", (int)solidP.X, (int)solidP.Y);
+                  }
+                });
+              }
               zz--;
             }
             yy--;
@@ -235,6 +245,15 @@ namespace SoloProjects.Dudhit.Utilities
              LineAlongPlaneGenerator(0, (int)p.Y, "z", (int)p.X, 0);
              LineAlongPlaneGenerator(0, (int)p.Y, "y", 0, (int)p.X);
            });
+        }//RE-ENFORCEMENT by adding thickness
+        else
+        {
+          Parallel.ForEach(xy.GetCurve(), p =>
+          {if((int)p.Y-1>-1){
+            LineAlongPlaneGenerator((int)p.Y-1, (int)p.Y, "x", (int)p.X, 0);
+            LineAlongPlaneGenerator((int)p.Y-1, (int)p.Y, "z", (int)p.X, 0);
+            LineAlongPlaneGenerator((int)p.Y-1, (int)p.Y, "y", 0, (int)p.X);
+         } });
         }
         Parallel.ForEach(xy.GetCurve(), p =>
  {
@@ -249,6 +268,13 @@ namespace SoloProjects.Dudhit.Utilities
               {
                 LineAlongPlaneGenerator(0, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
               });
+     }//RE-ENFORCEMENT by adding thickness
+     else
+     {
+       Parallel.ForEach(xz.GetCurve(), solidP =>
+       {
+         LineAlongPlaneGenerator((int)solidP.X-1, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
+       });
      }
    }
  }
@@ -273,10 +299,19 @@ namespace SoloProjects.Dudhit.Utilities
              LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
            });
         }
+        else//RE-ENFORCEMENT by adding thickness
+        {
+          Parallel.ForEach(xyCurve.GetCurve(), p =>
+          {
+            if((int)p.X-1>-1)
+            {
+            LineAlongPlaneGenerator((int)p.X-1, (int)p.X, "x", (int)p.Y, 0);
+          } });
+        }
         xyCurve=null;
       }
     }
- 
+
     /// <summary>
     /// 
     /// </summary>
@@ -294,10 +329,20 @@ namespace SoloProjects.Dudhit.Utilities
                LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
              });
         }
+        else//RE-ENFORCEMENT by adding thickness
+        {
+          Parallel.ForEach(xyCurve.GetCurve(), p =>
+          {
+            if((int)p.X-1>-1)
+            {
+              LineAlongPlaneGenerator((int)p.X-1, (int)p.X, "x", (int)p.Y, 0);
+            }
+          });
+        }
         xyCurve=null;
       }
     }
-  
+
     /// <summary>
     /// 
     /// </summary>
@@ -312,8 +357,8 @@ namespace SoloProjects.Dudhit.Utilities
           {
             Parallel.ForEach(GlobalCurveSet, ppp =>
             {
-              lock (sillyLock)
-              { 
+              lock(sillyLock)
+              {
                 tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
               }
             }
@@ -325,8 +370,8 @@ namespace SoloProjects.Dudhit.Utilities
           {
             Parallel.ForEach(GlobalCurveSet, ppp =>
             {
-              lock (sillyLock) 
-              { 
+              lock(sillyLock)
+              {
                 tempSet.Add(new Point3D(ppp.X, -1*ppp.Y, ppp.Z));
               }
             }
@@ -349,7 +394,7 @@ namespace SoloProjects.Dudhit.Utilities
       AddSetToGlobalSet(tempSet);
       tempSet=null;
     }
- 
+
     /// <summary>
     /// 
     /// </summary>
@@ -358,13 +403,13 @@ namespace SoloProjects.Dudhit.Utilities
     {
       Object sillyLock =new Object();
       Parallel.ForEach(anotherTempSet, ptd =>
-       //foreach(Point3D ptd in anotherTempSet)
+      //foreach(Point3D ptd in anotherTempSet)
       {
         lock(sillyLock)
         {
           AddNewPointToGlobalSet(ptd);
         }
-       });
+      });
     }
 
     /// <summary>
@@ -374,7 +419,7 @@ namespace SoloProjects.Dudhit.Utilities
     /// <param name="plane"></param>
     /// <param name="fixedPlaneValue"></param>
     /// <returns></returns>
-    private  HashSet<Point3D> TwoDIntoThreeDPoint(HashSet<Point> twoDPointCollection, string plane, int fixedPlaneValue)
+    private HashSet<Point3D> TwoDIntoThreeDPoint(HashSet<Point> twoDPointCollection, string plane, int fixedPlaneValue)
     {
 
       Object sillyLock = new Object();
@@ -384,43 +429,43 @@ namespace SoloProjects.Dudhit.Utilities
         case "xy":
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
-          // foreach(Point twoDPoint in twoDPointCollection)
+            // foreach(Point twoDPoint in twoDPointCollection)
             {
               lock(sillyLock)
               {
                 temporaryCollection.Add(new Point3D(twoDPoint.X, twoDPoint.Y, fixedPlaneValue));
               }
-          });
+            });
             break;
           }
         case "xz":
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
-             //  foreach(Point twoDPoint in twoDPointCollection)
+            //  foreach(Point twoDPoint in twoDPointCollection)
             {
               lock(sillyLock)
-              { 
+              {
                 temporaryCollection.Add(new Point3D(twoDPoint.X, fixedPlaneValue, twoDPoint.Y));
               }
-             });
+            });
             break;
           }
         case "yz":
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
-              //   foreach(Point twoDPoint in twoDPointCollection)
+            //   foreach(Point twoDPoint in twoDPointCollection)
             {
               lock(sillyLock)
               {
                 temporaryCollection.Add(new Point3D(fixedPlaneValue, twoDPoint.X, twoDPoint.Y));
               }
-              });
+            });
             break;
           }
       }
       return temporaryCollection;
     }
-  
+
     /// <summary>
     /// 
     /// </summary>
@@ -431,7 +476,7 @@ namespace SoloProjects.Dudhit.Utilities
       { GlobalCurveSet.Add(summonThirdDimension); }
 
     }
-  
+
     /// <summary>
     /// 
     /// </summary>
@@ -443,7 +488,7 @@ namespace SoloProjects.Dudhit.Utilities
     /// <returns></returns>
     private bool LineAlongPlaneGenerator(int start, int end, string axis, int yx, int zy)
     {
-      if(start<=0&&end>0&&axis!=string.Empty)
+      if(start<=end&&end>0&&axis!=string.Empty)
       {
         switch(axis)
         {
