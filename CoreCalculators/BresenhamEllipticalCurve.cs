@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
 
-namespace SoloProjects.Dudhit.Utilities
+namespace SoloProjects.Dudhit.Utilities.Curves
 {
   public class BresenhamEllipticalCurve
   {
