@@ -13,7 +13,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
 
   public class PointsToShape : IDisposable
   {
-    private ConcurrentDictionary<Point3D, byte> myThreadSafeData;
+    private ConcurrentBag<Point3D> myThreadSafeData;
     private int radiusX;
     private int radiusY;
     private int radiusZ;
@@ -40,7 +40,8 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// <param name="mass"></param>
     public PointsToShape(int myX, int myY, int myZ, int shape, bool mass, IProgress<MyTaskProgressReporter> progress)
     {
-      GlobalCurveSet = new HashSet<Point3D>();
+      myThreadSafeData = new ConcurrentBag<Point3D>();
+      //  GlobalCurveSet = new HashSet<Point3D>();
       this.radiusX=myX;
       this.radiusY=myY;
       this.radiusZ=myZ;
@@ -55,7 +56,20 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// </summary>
     public async void ProcessingShapeAsync()
     {
-      await Task.Run(() => { ProcessingShape(); });
+      /*  await Task.Run(() => {*/
+      ProcessingShape();/* });*/
+      await Task.Run(() => { ConvertAndRemoveDuplicates(); });
+    }
+
+    private void ConvertAndRemoveDuplicates()
+    {
+      GlobalCurveSet = new HashSet<Point3D>();
+      foreach(Point3D p in myThreadSafeData)
+      {
+        if(!GlobalCurveSet.Contains(p))
+          GlobalCurveSet.Add(p);
+      }
+      GiveFeedback(100, "\nData has shape.\n");
     }
 
     /// <summary>
@@ -79,6 +93,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             {
 
               MakeQuarterCircle();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
             }
             break;
@@ -89,7 +104,9 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusX, radiusX, "y", 0, 0))
             {
               MakeQuarterCircle();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
+              GiveFeedback(-1, "Adding more depth");
               MirrorGlobalSetByAxis("y");
             }
             break;
@@ -106,6 +123,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusX, radiusX, "x", 0, 0))
             {
               MakeQuarterEllipse();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
             }
             break;
@@ -116,7 +134,9 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusY, radiusY, "y", 0, 0))
             {
               MakeQuarterEllipse();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
+              GiveFeedback(-1, "Adding more depth");
               MirrorGlobalSetByAxis("y");
             }
             break;
@@ -134,7 +154,9 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusX, radiusX, "x", 0, 0)&&LineAlongPlaneGenerator(-1*radiusX, radiusX, "y", 0, 0))
             {
               MakeQuarterSphere();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
+              GiveFeedback(-1, "Adding more depth");
               MirrorGlobalSetByAxis("y");
             }
             break;
@@ -146,8 +168,11 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusX, radiusX, "z", 0, 0))
             {
               MakeQuarterSphere();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
+              GiveFeedback(-1, "Adding more depth");
               MirrorGlobalSetByAxis("y");
+              GiveFeedback(-1, "Adding even more depth");
               MirrorGlobalSetByAxis("z");
             }
             break;
@@ -166,7 +191,9 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusX, radiusX, "x", 0, 0)&&LineAlongPlaneGenerator(-1*radiusY, radiusY, "y", 0, 0))
             {
               MakeQuaterEllipsoid();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
+              GiveFeedback(-1, "Adding more depth");
               MirrorGlobalSetByAxis("y");
             }
             break;
@@ -178,8 +205,11 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             if(LineAlongPlaneGenerator(-1*radiusZ, radiusZ, "z", 0, 0))
             {
               MakeQuaterEllipsoid();
+              GiveFeedback(-1, "Adding depth");
               MirrorGlobalSetByAxis("x");
+              GiveFeedback(-1, "Adding more depth");
               MirrorGlobalSetByAxis("y");
+              GiveFeedback(-1, "Adding even moredepth");
               MirrorGlobalSetByAxis("z");
             }
             break;
@@ -188,7 +218,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       }
     }
 
-     private void MakeQuaterEllipsoid()
+    private void MakeQuaterEllipsoid()
     {
       if(LineAlongPlaneGenerator(0, radiusX, "x", 0, 0)&&LineAlongPlaneGenerator(0, radiusY, "y", 0, 0)&&LineAlongPlaneGenerator(0, radiusZ, "z", 0, 0))
       {
@@ -201,6 +231,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", 0));
         AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", 0));
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "xy", 0));
+        GiveFeedback(PercentComplete(), " base Ellipsoid calculated");
         //generate yz curve along X using xy and xz curve points the lazy way
         int xx= radiusX;
         int yy=radiusY;
@@ -217,7 +248,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
                 yz.BeginCalculations();
                 AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", xx));
                 estimateCalculated++;
-                GiveFeedback();
+                GiveFeedback(PercentComplete(), null);
                 if(solid)
                 {
                   Parallel.ForEach(yz.GetCurve(), solidP =>
@@ -251,7 +282,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       }
     }
 
-      private void MakeQuarterSphere()
+    private void MakeQuarterSphere()
     {
       if(LineAlongPlaneGenerator(0, radiusX, "x", 0, 0)&&LineAlongPlaneGenerator(0, radiusX, "y", 0, 0)&&LineAlongPlaneGenerator(0, radiusX, "z", 0, 0))
       {
@@ -260,6 +291,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "xy", 0));
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "xz", 0));
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "yz", 0));
+        GiveFeedback(PercentComplete(), " base sphere calculated");
         if(solid)
         {
           Parallel.ForEach(xy.GetCurve(), p =>
@@ -289,8 +321,8 @@ namespace SoloProjects.Dudhit.Utilities.Curves
             BresenhamCircularCurve xz= new BresenhamCircularCurve((int)p.X);
             xz.BeginCalculations();
             AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", (int)p.Y));
-            estimateCalculated++;
-            GiveFeedback();
+            Interlocked.Increment(ref estimateCalculated);
+            GiveFeedback(PercentComplete(), "sphere building");
             if(solid)
             {
               Parallel.ForEach(xz.GetCurve(), solidP =>
@@ -312,15 +344,15 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       }
     }
 
-       private void MakeQuarterEllipse()
+    private void MakeQuarterEllipse()
     {
       if(LineAlongPlaneGenerator(0, radiusX, "x", 0, 0)&& LineAlongPlaneGenerator(0, radiusY, "y", 0, 0))
       {
         BresenhamEllipticalCurve xyCurve = new BresenhamEllipticalCurve(radiusX, radiusY);
         xyCurve.BeginCalculations();
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xyCurve.GetCurve(), "xy", 0));
-        estimateCalculated++;
-        GiveFeedback();
+        Interlocked.Increment(ref estimateCalculated);
+        GiveFeedback(PercentComplete(), "base ellipse calculated");
         if(solid)
         {
           Parallel.ForEach(xyCurve.GetCurve(), p =>
@@ -343,15 +375,15 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       }
     }
 
-        private void MakeQuarterCircle()
+    private void MakeQuarterCircle()
     {
       if(LineAlongPlaneGenerator(0, radiusX, "x", 0, 0)&&LineAlongPlaneGenerator(0, radiusX, "y", 0, 0))
       {
         BresenhamCircularCurve xyCurve= new BresenhamCircularCurve(radiusX);
         xyCurve.BeginCalculations();
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xyCurve.GetCurve(), "xy", 0));
-        estimateCalculated++;
-        GiveFeedback();
+        Interlocked.Increment(ref estimateCalculated);
+        GiveFeedback(PercentComplete(), "\nBase Circle calculated\n");
         if(solid)
         {
           Parallel.ForEach(xyCurve.GetCurve(), p =>
@@ -374,10 +406,15 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       }
     }
 
-    private void GiveFeedback()
+    private void GiveFeedback(double number, string message)
     {
       if(progress!=null)
-        progress.Report(new MyTaskProgressReporter() { ProgressCounter=((estimateCalculated/estimateTotalCalculations)*100) });
+        progress.Report(new MyTaskProgressReporter() { ProgressCounter= number, ProgressMessage=message });
+    }
+
+    private double PercentComplete()
+    {
+      return ((estimateCalculated/estimateTotalCalculations)*100);
     }
 
     /// <summary>
@@ -386,22 +423,22 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// <param name="axis"></param>
     private void MirrorGlobalSetByAxis(string axis)
     {
-      Object sillyLock = new Object();
-      HashSet<Point3D> tempSet= new HashSet<Point3D>();
+      //   Object sillyLock = new Object();
+      ConcurrentBag<Point3D> tempSet= new ConcurrentBag<Point3D>();
       estimateCalculated=0;
-      estimateTotalCalculations = GlobalCurveSet.Count;
+      estimateTotalCalculations =myThreadSafeData.Count;
       switch(axis)
       {
         case "x":
           {
-            Parallel.ForEach(GlobalCurveSet, ppp =>
+            Parallel.ForEach(myThreadSafeData, ppp =>
             {
-              lock(sillyLock)
-              {
-                Interlocked.Increment(ref estimateCalculated);
-                GiveFeedback();
-                tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
-              }
+              //      lock(sillyLock)
+              //        {
+              Interlocked.Increment(ref estimateCalculated);
+              GiveFeedback(PercentComplete(), null);
+              tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
+              //       }
             }
             );
 
@@ -409,28 +446,28 @@ namespace SoloProjects.Dudhit.Utilities.Curves
           }
         case "y":
           {
-            Parallel.ForEach(GlobalCurveSet, ppp =>
+            Parallel.ForEach(myThreadSafeData, ppp =>
             {
-              lock(sillyLock)
-              {
-                estimateCalculated++;
-                GiveFeedback();
-                tempSet.Add(new Point3D(ppp.X, -1*ppp.Y, ppp.Z));
-              }
+              //       lock(sillyLock)
+              //        {
+              estimateCalculated++;
+              GiveFeedback(PercentComplete(), null);
+              tempSet.Add(new Point3D(ppp.X, -1*ppp.Y, ppp.Z));
+              //        }
             }
             );
             break;
           }
         case "z":
           {
-            Parallel.ForEach(GlobalCurveSet, ppp =>
+            Parallel.ForEach(myThreadSafeData, ppp =>
             {
-              lock(sillyLock)
-              {
-                estimateCalculated++;
-                GiveFeedback();
-                tempSet.Add(new Point3D(ppp.X, ppp.Y, -1*ppp.Z));
-              }
+              //        lock(sillyLock)
+              //        {
+              estimateCalculated++;
+              GiveFeedback(PercentComplete(), null);
+              tempSet.Add(new Point3D(ppp.X, ppp.Y, -1*ppp.Z));
+              //       }
             }
             );
             break;
@@ -444,16 +481,17 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// takes a Hashset<Point3D> and adds to global collection
     /// </summary>
     /// <param name="anotherTempSet"></param>
-    private void AddSetToGlobalSet(HashSet<Point3D> anotherTempSet)
+    private void AddSetToGlobalSet(ConcurrentBag<Point3D> anotherTempSet)
     {
-      Object sillyLock =new Object();
+
+      //   Object sillyLock =new Object();
       Parallel.ForEach(anotherTempSet, ptd =>
       //foreach(Point3D ptd in anotherTempSet)
       {
-        lock(sillyLock)
-        {
-          AddNewPointToGlobalSet(ptd);
-        }
+        //     lock(sillyLock)
+        //     {
+        AddNewPointToGlobalSet(ptd);
+        //     }
       });
     }
 
@@ -464,21 +502,21 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// <param name="plane"></param>
     /// <param name="fixedPlaneValue"></param>
     /// <returns></returns>
-    private HashSet<Point3D> TwoDIntoThreeDPoint(HashSet<Point> twoDPointCollection, string plane, int fixedPlaneValue)
+    private ConcurrentBag<Point3D> TwoDIntoThreeDPoint(HashSet<Point> twoDPointCollection, string plane, int fixedPlaneValue)
     {
 
-      Object sillyLock = new Object();
-      HashSet<Point3D> temporaryCollection = new HashSet<Point3D>();
+      //  Object sillyLock = new Object();
+      ConcurrentBag<Point3D> temporaryCollection = new ConcurrentBag<Point3D>();
       switch(plane)
       {
         case "xy":
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
             {
-              lock(sillyLock)
-              {
-                temporaryCollection.Add(new Point3D(twoDPoint.X, twoDPoint.Y, fixedPlaneValue));
-              }
+              //  lock(sillyLock)
+              // {
+              temporaryCollection.Add(new Point3D(twoDPoint.X, twoDPoint.Y, fixedPlaneValue));
+              //  }
             });
             break;
           }
@@ -486,10 +524,10 @@ namespace SoloProjects.Dudhit.Utilities.Curves
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
             {
-              lock(sillyLock)
-              {
-                temporaryCollection.Add(new Point3D(twoDPoint.X, fixedPlaneValue, twoDPoint.Y));
-              }
+              //      lock(sillyLock)
+              //     {
+              temporaryCollection.Add(new Point3D(twoDPoint.X, fixedPlaneValue, twoDPoint.Y));
+              //     }
             });
             break;
           }
@@ -497,10 +535,10 @@ namespace SoloProjects.Dudhit.Utilities.Curves
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
             {
-              lock(sillyLock)
-              {
-                temporaryCollection.Add(new Point3D(fixedPlaneValue, twoDPoint.X, twoDPoint.Y));
-              }
+              //    lock(sillyLock)
+              //    {
+              temporaryCollection.Add(new Point3D(fixedPlaneValue, twoDPoint.X, twoDPoint.Y));
+              //    }
             });
             break;
           }
@@ -512,10 +550,12 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// 
     /// </summary>
     /// <param name="summonThirdDimension"></param>
-    private void AddNewPointToGlobalSet(Point3D summonThirdDimension)
+    private void AddNewPointToGlobalSet(Point3D pointToAdd)
     {
-      if(!GlobalCurveSet.Contains(summonThirdDimension))
-      { GlobalCurveSet.Add(summonThirdDimension); }
+      //  if(!myThreadSafeData..Contains(summonThirdDimension))
+      //   {
+      myThreadSafeData.Add(pointToAdd);
+      //}
 
     }
 
