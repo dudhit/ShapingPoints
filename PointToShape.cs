@@ -13,7 +13,10 @@ namespace SoloProjects.Dudhit.Utilities.Curves
 
   public class PointsToShape : IDisposable
   {
-    private ConcurrentBag<Point3D> myThreadSafeData;
+    private ConcurrentQueue<Point3D> myThreadSafeData;
+    //  private HashSet<Point3D> myThreadSafeData;
+    //  private ConcurrentBag<Point3D> myThreadSafeData;
+    private object lockingOb;
     private int radiusX;
     private int radiusY;
     private int radiusZ;
@@ -22,6 +25,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     private double estimateTotalCalculations;
     private int estimateCalculated;
     public HashSet<Point3D> GlobalCurveSet;
+    private ParallelOptions setCrashDependancy;
     private IProgress<MyTaskProgressReporter> progress;
     /* 
     quartercircle 17 semicircle 33 fullcircle 65 x
@@ -40,8 +44,9 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// <param name="mass"></param>
     public PointsToShape(int myX, int myY, int myZ, int shape, bool mass, IProgress<MyTaskProgressReporter> progress)
     {
-      myThreadSafeData = new ConcurrentBag<Point3D>();
-      //  GlobalCurveSet = new HashSet<Point3D>();
+      myThreadSafeData = new ConcurrentQueue<Point3D>();
+      //   myThreadSafeData = new HashSet<Point3D>();
+      //  myThreadSafeData = new ConcurrentBag<Point3D>();
       this.radiusX=myX;
       this.radiusY=myY;
       this.radiusZ=myZ;
@@ -49,6 +54,9 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       this.solid=mass;
       this.estimateCalculated=0;
       this.progress=progress;
+      this.lockingOb=new object();
+      this.setCrashDependancy =   new ParallelOptions() { MaxDegreeOfParallelism = 4 };
+
     }
 
     /// <summary>
@@ -248,22 +256,28 @@ namespace SoloProjects.Dudhit.Utilities.Curves
                 yz.BeginCalculations();
                 AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", xx));
                 estimateCalculated++;
-                GiveFeedback(PercentComplete(), null);
+                // GiveFeedback(PercentComplete(), null);
                 if(solid)
                 {
                   Parallel.ForEach(yz.GetCurve(), solidP =>
                     {
-                      LineAlongPlaneGenerator(0, xx, "x", (int)solidP.X, (int)solidP.Y);
+                      lock(lockingOb)
+                      {
+                        LineAlongPlaneGenerator(0, xx, "x", (int)solidP.X, (int)solidP.Y);
+                      }
                     });
                 }
                 else
                 {
                   Parallel.ForEach(yz.GetCurve(), solidP =>
                   {
-                    int thickness=xx-2;
-                    if(thickness>0)
+                    lock(lockingOb)
                     {
-                      LineAlongPlaneGenerator(thickness, xx, "x", (int)solidP.X, (int)solidP.Y);
+                      int thickness=xx-2;
+                      if(thickness>0)
+                      {
+                        LineAlongPlaneGenerator(thickness, xx, "x", (int)solidP.X, (int)solidP.Y);
+                      }
                     }
                   });
                 }
@@ -294,48 +308,63 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         GiveFeedback(PercentComplete(), " base sphere calculated");
         if(solid)
         {
-          Parallel.ForEach(xy.GetCurve(), p =>
+          Parallel.ForEach(xy.GetCurve(), setCrashDependancy, p =>
           {
-            LineAlongPlaneGenerator(0, (int)p.Y, "x", (int)p.X, 0);
-            LineAlongPlaneGenerator(0, (int)p.Y, "z", (int)p.X, 0);
-            LineAlongPlaneGenerator(0, (int)p.Y, "y", 0, (int)p.X);
+            lock(lockingOb)
+            {
+              LineAlongPlaneGenerator(0, (int)p.Y, "x", (int)p.X, 0);
+              LineAlongPlaneGenerator(0, (int)p.Y, "z", (int)p.X, 0);
+              LineAlongPlaneGenerator(0, (int)p.Y, "y", 0, (int)p.X);
+            }
           });
         }//RE-ENFORCEMENT by adding thickness
         else
         {
-          Parallel.ForEach(xy.GetCurve(), p =>
+          Parallel.ForEach(xy.GetCurve(), setCrashDependancy, p =>
           {
-            int thickness=(int)p.Y-2;
-            if(thickness>0)
+            lock(lockingOb)
             {
-              LineAlongPlaneGenerator(thickness, (int)p.Y, "x", (int)p.X, 0);
-              LineAlongPlaneGenerator(thickness, (int)p.Y, "z", (int)p.X, 0);
-              LineAlongPlaneGenerator(thickness, (int)p.Y, "y", 0, (int)p.X);
+              int thickness=(int)p.Y-2;
+              if(thickness>0)
+              {
+                LineAlongPlaneGenerator(thickness, (int)p.Y, "x", (int)p.X, 0);
+                LineAlongPlaneGenerator(thickness, (int)p.Y, "z", (int)p.X, 0);
+                LineAlongPlaneGenerator(thickness, (int)p.Y, "y", 0, (int)p.X);
+              }
             }
           });
         }
-        Parallel.ForEach(xy.GetCurve(), p =>
+        Parallel.ForEach(xy.GetCurve(), setCrashDependancy, p =>
         {
-          if(p.X>0)
+          lock(lockingOb)
           {
-            BresenhamCircularCurve xz= new BresenhamCircularCurve((int)p.X);
-            xz.BeginCalculations();
-            AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", (int)p.Y));
-            Interlocked.Increment(ref estimateCalculated);
-            GiveFeedback(PercentComplete(), "sphere building");
-            if(solid)
+            if(p.X>0)
             {
-              Parallel.ForEach(xz.GetCurve(), solidP =>
+              BresenhamCircularCurve xz= new BresenhamCircularCurve((int)p.X);
+              xz.BeginCalculations();
+              AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", (int)p.Y));
+              Interlocked.Increment(ref estimateCalculated);
+              GiveFeedback(PercentComplete(), "sphere building");
+              if(solid)
               {
-                LineAlongPlaneGenerator(0, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
-              });
-            }//RE-ENFORCEMENT by adding thickness
-            else
-            {
-              Parallel.ForEach(xz.GetCurve(), solidP =>
+                Parallel.ForEach(xz.GetCurve(), setCrashDependancy, solidP =>
+                {
+                  lock(lockingOb)
+                  {
+                    LineAlongPlaneGenerator(0, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
+                  }
+                });
+              }//RE-ENFORCEMENT by adding thickness
+              else
               {
-                LineAlongPlaneGenerator((int)solidP.X-1, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
-              });
+                Parallel.ForEach(xz.GetCurve(), setCrashDependancy, solidP =>
+                {
+                  lock(lockingOb)
+                  {
+                    LineAlongPlaneGenerator((int)solidP.X-1, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
+                  }
+                });
+              }
             }
           }
         }
@@ -355,19 +384,25 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         GiveFeedback(PercentComplete(), "base ellipse calculated");
         if(solid)
         {
-          Parallel.ForEach(xyCurve.GetCurve(), p =>
+          Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
           {
-            LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
+            lock(lockingOb)
+            {
+              LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
+            }
           });
         }
         else//RE-ENFORCEMENT by adding thickness
         {
-          Parallel.ForEach(xyCurve.GetCurve(), p =>
+          Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
           {
-            int thickness=(int)p.X-2;
-            if(thickness>0)
+            lock(lockingOb)
             {
-              LineAlongPlaneGenerator(thickness, (int)p.X, "x", (int)p.Y, 0);
+              int thickness=(int)p.X-2;
+              if(thickness>0)
+              {
+                LineAlongPlaneGenerator(thickness, (int)p.X, "x", (int)p.Y, 0);
+              }
             }
           });
         }
@@ -386,19 +421,25 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         GiveFeedback(PercentComplete(), "\nBase Circle calculated\n");
         if(solid)
         {
-          Parallel.ForEach(xyCurve.GetCurve(), p =>
+          Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
           {
-            LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
+            lock(lockingOb)
+            {
+              LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
+            }
           });
         }
         else//RE-ENFORCEMENT by adding thickness
         {
-          Parallel.ForEach(xyCurve.GetCurve(), p =>
+          Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
           {
-            int thickness=(int)p.X-2;
-            if(thickness>0)
+            lock(lockingOb)
             {
-              LineAlongPlaneGenerator(thickness, (int)p.X, "x", (int)p.Y, 0);
+              int thickness=(int)p.X-2;
+              if(thickness>0)
+              {
+                LineAlongPlaneGenerator(thickness, (int)p.X, "x", (int)p.Y, 0);
+              }
             }
           });
         }
@@ -424,21 +465,22 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     private void MirrorGlobalSetByAxis(string axis)
     {
       //   Object sillyLock = new Object();
-      ConcurrentBag<Point3D> tempSet= new ConcurrentBag<Point3D>();
+
       estimateCalculated=0;
       estimateTotalCalculations =myThreadSafeData.Count;
+      ConcurrentBag<Point3D> tempSet= new ConcurrentBag<Point3D>();
       switch(axis)
       {
         case "x":
           {
-            Parallel.ForEach(myThreadSafeData, ppp =>
+            Parallel.ForEach(myThreadSafeData, setCrashDependancy, ppp =>
             {
-              //      lock(sillyLock)
-              //        {
-              Interlocked.Increment(ref estimateCalculated);
-              GiveFeedback(PercentComplete(), null);
-              tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
-              //       }
+              lock(lockingOb)
+              {
+                Interlocked.Increment(ref estimateCalculated);
+                GiveFeedback(PercentComplete(), null);
+                tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
+              }
             }
             );
 
@@ -446,28 +488,28 @@ namespace SoloProjects.Dudhit.Utilities.Curves
           }
         case "y":
           {
-            Parallel.ForEach(myThreadSafeData, ppp =>
+            Parallel.ForEach(myThreadSafeData, setCrashDependancy, ppp =>
             {
-              //       lock(sillyLock)
-              //        {
-              estimateCalculated++;
-              GiveFeedback(PercentComplete(), null);
-              tempSet.Add(new Point3D(ppp.X, -1*ppp.Y, ppp.Z));
-              //        }
+              lock(lockingOb)
+              {
+                estimateCalculated++;
+                GiveFeedback(PercentComplete(), null);
+                tempSet.Add(new Point3D(ppp.X, -1*ppp.Y, ppp.Z));
+              }
             }
             );
             break;
           }
         case "z":
           {
-            Parallel.ForEach(myThreadSafeData, ppp =>
+            Parallel.ForEach(myThreadSafeData, setCrashDependancy, ppp =>
             {
-              //        lock(sillyLock)
-              //        {
-              estimateCalculated++;
-              GiveFeedback(PercentComplete(), null);
-              tempSet.Add(new Point3D(ppp.X, ppp.Y, -1*ppp.Z));
-              //       }
+              lock(lockingOb)
+              {
+                estimateCalculated++;
+                GiveFeedback(PercentComplete(), null);
+                tempSet.Add(new Point3D(ppp.X, ppp.Y, -1*ppp.Z));
+              }
             }
             );
             break;
@@ -485,13 +527,13 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     {
 
       //   Object sillyLock =new Object();
-      Parallel.ForEach(anotherTempSet, ptd =>
+      Parallel.ForEach(anotherTempSet, setCrashDependancy, ptd =>
       //foreach(Point3D ptd in anotherTempSet)
       {
-        //     lock(sillyLock)
-        //     {
-        AddNewPointToGlobalSet(ptd);
-        //     }
+        lock(lockingOb)
+        {
+          AddNewPointToGlobalSet(ptd);
+        }
       });
     }
 
@@ -511,12 +553,12 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       {
         case "xy":
           {
-            Parallel.ForEach(twoDPointCollection, twoDPoint =>
+            Parallel.ForEach(twoDPointCollection, setCrashDependancy, twoDPoint =>
             {
-              //  lock(sillyLock)
-              // {
-              temporaryCollection.Add(new Point3D(twoDPoint.X, twoDPoint.Y, fixedPlaneValue));
-              //  }
+              lock(lockingOb)
+              {
+                temporaryCollection.Add(new Point3D(twoDPoint.X, twoDPoint.Y, fixedPlaneValue));
+              }
             });
             break;
           }
@@ -524,10 +566,10 @@ namespace SoloProjects.Dudhit.Utilities.Curves
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
             {
-              //      lock(sillyLock)
-              //     {
-              temporaryCollection.Add(new Point3D(twoDPoint.X, fixedPlaneValue, twoDPoint.Y));
-              //     }
+              lock(lockingOb)
+              {
+                temporaryCollection.Add(new Point3D(twoDPoint.X, fixedPlaneValue, twoDPoint.Y));
+              }
             });
             break;
           }
@@ -535,10 +577,10 @@ namespace SoloProjects.Dudhit.Utilities.Curves
           {
             Parallel.ForEach(twoDPointCollection, twoDPoint =>
             {
-              //    lock(sillyLock)
-              //    {
-              temporaryCollection.Add(new Point3D(fixedPlaneValue, twoDPoint.X, twoDPoint.Y));
-              //    }
+              lock(lockingOb)
+              {
+                temporaryCollection.Add(new Point3D(fixedPlaneValue, twoDPoint.X, twoDPoint.Y));
+              }
             });
             break;
           }
@@ -546,15 +588,12 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       return temporaryCollection;
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="summonThirdDimension"></param>
+
     private void AddNewPointToGlobalSet(Point3D pointToAdd)
     {
       //  if(!myThreadSafeData..Contains(summonThirdDimension))
       //   {
-      myThreadSafeData.Add(pointToAdd);
+      myThreadSafeData.Enqueue(pointToAdd);
       //}
 
     }
