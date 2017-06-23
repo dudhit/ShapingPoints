@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -9,19 +10,19 @@ using System.Windows.Media.Media3D;
 
 namespace SoloProjects.Dudhit.Utilities.Curves
 {
-  public delegate void DetermineProcessingPathsCompletedEventHandler(object sender, DetermineProcessingPathsCompletedEventArgs e);
+  //public delegate void DetermineProcessingPathsCompletedEventHandler(object sender, DetermineProcessingPathsCompletedEventArgs e);
 
   public class PointsToShape : IDisposable
   {
-    private ConcurrentQueue<Point3D> myThreadSafeData;
+    //private ConcurrentQueue<Point3D> myThreadSafeData;
     //  private HashSet<Point3D> myThreadSafeData;
-    //  private ConcurrentBag<Point3D> myThreadSafeData;
+    private ConcurrentBag<Point3D> myThreadSafeData;
     private object lockingOb;
     private int radiusX;
     private int radiusY;
     private int radiusZ;
     private int shape;
-    private bool solid;
+    private int wallThickness;
     private double estimateTotalCalculations;
     private int estimateCalculated;
     public HashSet<Point3D> GlobalCurveSet;
@@ -42,20 +43,25 @@ namespace SoloProjects.Dudhit.Utilities.Curves
     /// <param name="myZ"></param>
     /// <param name="shape"></param>
     /// <param name="mass"></param>
-    public PointsToShape(int myX, int myY, int myZ, int shape, bool mass, IProgress<MyTaskProgressReporter> progress)
+    public PointsToShape(int myX, int myY, int myZ, int shape, int mass, IProgress<MyTaskProgressReporter> progress)
+      : this(myX, myY, myZ, shape, mass)
+    { this.progress=progress; }
+    public PointsToShape(int myX, int myY, int myZ, int shape, int mass)
     {
-      myThreadSafeData = new ConcurrentQueue<Point3D>();
+
+      // myThreadSafeData = new ConcurrentQueue<Point3D>();
       //   myThreadSafeData = new HashSet<Point3D>();
-      //  myThreadSafeData = new ConcurrentBag<Point3D>();
+      myThreadSafeData = new ConcurrentBag<Point3D>();
       this.radiusX=myX;
       this.radiusY=myY;
       this.radiusZ=myZ;
       this.shape=shape;
-      this.solid=mass;
+      this.wallThickness=mass;
       this.estimateCalculated=0;
-      this.progress=progress;
+
       this.lockingOb=new object();
       this.setCrashDependancy =   new ParallelOptions() { MaxDegreeOfParallelism = 4 };
+      using(StreamWriter sw = new StreamWriter("tempData", false)) { sw.WriteLine("points"); }
 
     }
 
@@ -210,6 +216,7 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         case 72: // fullellipsiod 72 xyz
           {
             estimateTotalCalculations = Geometries.EllipseVolume(radiusX, radiusY, radiusZ);
+
             if(LineAlongPlaneGenerator(-1*radiusZ, radiusZ, "z", 0, 0))
             {
               MakeQuaterEllipsoid();
@@ -228,72 +235,62 @@ namespace SoloProjects.Dudhit.Utilities.Curves
 
     private void MakeQuaterEllipsoid()
     {
-      if(LineAlongPlaneGenerator(0, radiusX, "x", 0, 0)&&LineAlongPlaneGenerator(0, radiusY, "y", 0, 0)&&LineAlongPlaneGenerator(0, radiusZ, "z", 0, 0))
+      LineAlongPlaneGenerator(0, radiusX, "x", 0, 0);
+      LineAlongPlaneGenerator(0, radiusY, "y", 0, 0);
+      LineAlongPlaneGenerator(0, radiusZ, "z", 0, 0);
+
+      BresenhamEllipticalCurve xz = new BresenhamEllipticalCurve(radiusX, radiusZ);
+      xz.BeginCalculations();
+      BresenhamEllipticalCurve yz = new BresenhamEllipticalCurve(radiusY, radiusZ);
+      yz.BeginCalculations();
+      BresenhamEllipticalCurve xy = new BresenhamEllipticalCurve(radiusX, radiusY);
+      xy.BeginCalculations();
+      AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", 0));
+      AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", 0));
+      AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "xy", 0));
+      GiveFeedback(PercentComplete(), " base Ellipsoid calculated");
+      //generate yz curve along X using xy and xz curve points the lazy way
+      int xx= radiusX;
+      int yy=radiusY;
+      int zz=radiusZ;
+      while(xx>0)
       {
-        BresenhamEllipticalCurve xz = new BresenhamEllipticalCurve(radiusX, radiusZ);
-        xz.BeginCalculations();
-        BresenhamEllipticalCurve yz = new BresenhamEllipticalCurve(radiusY, radiusZ);
-        yz.BeginCalculations();
-        BresenhamEllipticalCurve xy = new BresenhamEllipticalCurve(radiusX, radiusY);
-        xy.BeginCalculations();
-        AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", 0));
-        AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", 0));
-        AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "xy", 0));
-        GiveFeedback(PercentComplete(), " base Ellipsoid calculated");
-        //generate yz curve along X using xy and xz curve points the lazy way
-        int xx= radiusX;
-        int yy=radiusY;
-        int zz=radiusZ;
-        while(xx>0)
+        while(yy>0)
         {
-          while(yy>0)
+          while(zz>0)
           {
-            while(zz>0)
+            if(xy.GetCurve().Contains(new Point(xx, yy))&&xz.GetCurve().Contains(new Point(xx, zz)))
             {
-              if(xy.GetCurve().Contains(new Point(xx, yy))&&xz.GetCurve().Contains(new Point(xx, zz)))
+              yz =new BresenhamEllipticalCurve(yy, zz);
+              yz.BeginCalculations();
+              AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", xx));
+              estimateCalculated++;
+              // GiveFeedback(PercentComplete(), null);
+              if(wallThickness!=0)
               {
-                yz =new BresenhamEllipticalCurve(yy, zz);
-                yz.BeginCalculations();
-                AddSetToGlobalSet(TwoDIntoThreeDPoint(yz.GetCurve(), "yz", xx));
-                estimateCalculated++;
-                // GiveFeedback(PercentComplete(), null);
-                if(solid)
-                {
-                  Parallel.ForEach(yz.GetCurve(), solidP =>
-                    {
-                      lock(lockingOb)
-                      {
-                        LineAlongPlaneGenerator(0, xx, "x", (int)solidP.X, (int)solidP.Y);
-                      }
-                    });
-                }
-                else
-                {
-                  Parallel.ForEach(yz.GetCurve(), solidP =>
-                  {
-                    lock(lockingOb)
-                    {
-                      int thickness=xx-2;
-                      if(thickness>0)
-                      {
-                        LineAlongPlaneGenerator(thickness, xx, "x", (int)solidP.X, (int)solidP.Y);
-                      }
-                    }
-                  });
-                }
+                Parallel.ForEach(yz.GetCurve(), solidP =>
+{
+  int thickness=xx-wallThickness;
+  if(thickness>0)
+  {
+    LineAlongPlaneGenerator(thickness, xx, "x", (int)solidP.X, (int)solidP.Y);
+  }
+
+});
               }
-              zz--;
             }
-            yy--;
-            zz=radiusZ;
+            zz--;
           }
-          xx--;
-          yy=radiusY;
+          yy--;
+          zz=radiusZ;
         }
-        xy=null;
-        yz=null;
-        xz=null;
+        xx--;
+        yy=radiusY;
       }
+      xy=null;
+      yz=null;
+      xz=null;
+
     }
 
     private void MakeQuarterSphere()
@@ -306,25 +303,13 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "xz", 0));
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xy.GetCurve(), "yz", 0));
         GiveFeedback(PercentComplete(), " base sphere calculated");
-        if(solid)
+        if(wallThickness!=0)
         {
           Parallel.ForEach(xy.GetCurve(), setCrashDependancy, p =>
           {
             lock(lockingOb)
             {
-              LineAlongPlaneGenerator(0, (int)p.Y, "x", (int)p.X, 0);
-              LineAlongPlaneGenerator(0, (int)p.Y, "z", (int)p.X, 0);
-              LineAlongPlaneGenerator(0, (int)p.Y, "y", 0, (int)p.X);
-            }
-          });
-        }//RE-ENFORCEMENT by adding thickness
-        else
-        {
-          Parallel.ForEach(xy.GetCurve(), setCrashDependancy, p =>
-          {
-            lock(lockingOb)
-            {
-              int thickness=(int)p.Y-2;
+              int thickness=(int)p.Y-wallThickness;
               if(thickness>0)
               {
                 LineAlongPlaneGenerator(thickness, (int)p.Y, "x", (int)p.X, 0);
@@ -345,23 +330,17 @@ namespace SoloProjects.Dudhit.Utilities.Curves
               AddSetToGlobalSet(TwoDIntoThreeDPoint(xz.GetCurve(), "xz", (int)p.Y));
               Interlocked.Increment(ref estimateCalculated);
               GiveFeedback(PercentComplete(), "sphere building");
-              if(solid)
+              if(wallThickness!=0)
               {
                 Parallel.ForEach(xz.GetCurve(), setCrashDependancy, solidP =>
                 {
                   lock(lockingOb)
                   {
-                    LineAlongPlaneGenerator(0, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
-                  }
-                });
-              }//RE-ENFORCEMENT by adding thickness
-              else
-              {
-                Parallel.ForEach(xz.GetCurve(), setCrashDependancy, solidP =>
-                {
-                  lock(lockingOb)
-                  {
-                    LineAlongPlaneGenerator((int)solidP.X-1, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
+                    int thickness=(int)solidP.X-wallThickness;
+                    if(thickness>0)
+                    {
+                      LineAlongPlaneGenerator(thickness, (int)solidP.X, "x", (int)p.Y, (int)solidP.Y);
+                    }
                   }
                 });
               }
@@ -382,23 +361,13 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xyCurve.GetCurve(), "xy", 0));
         Interlocked.Increment(ref estimateCalculated);
         GiveFeedback(PercentComplete(), "base ellipse calculated");
-        if(solid)
+        if(wallThickness!=0)
         {
           Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
           {
             lock(lockingOb)
             {
-              LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
-            }
-          });
-        }
-        else//RE-ENFORCEMENT by adding thickness
-        {
-          Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
-          {
-            lock(lockingOb)
-            {
-              int thickness=(int)p.X-2;
+              int thickness=(int)p.X-wallThickness;
               if(thickness>0)
               {
                 LineAlongPlaneGenerator(thickness, (int)p.X, "x", (int)p.Y, 0);
@@ -419,23 +388,13 @@ namespace SoloProjects.Dudhit.Utilities.Curves
         AddSetToGlobalSet(TwoDIntoThreeDPoint(xyCurve.GetCurve(), "xy", 0));
         Interlocked.Increment(ref estimateCalculated);
         GiveFeedback(PercentComplete(), "\nBase Circle calculated\n");
-        if(solid)
+        if(wallThickness!=0)
         {
           Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
           {
             lock(lockingOb)
             {
-              LineAlongPlaneGenerator(0, (int)p.X, "x", (int)p.Y, 0);
-            }
-          });
-        }
-        else//RE-ENFORCEMENT by adding thickness
-        {
-          Parallel.ForEach(xyCurve.GetCurve(), setCrashDependancy, p =>
-          {
-            lock(lockingOb)
-            {
-              int thickness=(int)p.X-2;
+              int thickness=(int)p.X-wallThickness;
               if(thickness>0)
               {
                 LineAlongPlaneGenerator(thickness, (int)p.X, "x", (int)p.Y, 0);
@@ -473,17 +432,33 @@ namespace SoloProjects.Dudhit.Utilities.Curves
       {
         case "x":
           {
-            Parallel.ForEach(myThreadSafeData, setCrashDependancy, ppp =>
-            {
-              lock(lockingOb)
-              {
-                Interlocked.Increment(ref estimateCalculated);
-                GiveFeedback(PercentComplete(), null);
-                tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
-              }
-            }
-            );
+            ////using partitioner
+            //Parallel.ForEach(Partitioner.Create(0, (int)estimateTotalCalculations), (range, loopState) =>
+            //{
+            //  for(int index = range.Item1;index < range.Item2;index++)
+            //  {
+            //   var x= myThreadSafeData[index];
+            //  //  DoStuff(MyList.ElementAt(index));
+            //    Interlocked.Increment(ref estimateCalculated);
+            //    if(estimateCalculated % 100 == 0)
+            //      GiveFeedback(PercentComplete(), null);
+            //  }
+            //});
 
+            //Parallel.ForEach(myThreadSafeData, setCrashDependancy, ppp =>
+            //{
+            //  lock(lockingOb)
+            //  {
+            //    Interlocked.Increment(ref estimateCalculated);
+            //    GiveFeedback(PercentComplete(), null);
+            //    tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
+            //  }
+            //}
+            //);
+            foreach(Point3D ppp in myThreadSafeData)
+            {
+              tempSet.Add(new Point3D(-1*ppp.X, ppp.Y, ppp.Z));
+            }
             break;
           }
         case "y":
@@ -591,11 +566,18 @@ namespace SoloProjects.Dudhit.Utilities.Curves
 
     private void AddNewPointToGlobalSet(Point3D pointToAdd)
     {
+
       //  if(!myThreadSafeData..Contains(summonThirdDimension))
       //   {
-      myThreadSafeData.Enqueue(pointToAdd);
+      //  myThreadSafeData.Enqueue(pointToAdd);
+      myThreadSafeData.Add(pointToAdd);
+      //   System.Diagnostics.Trace.WriteLine(pointToAdd);
       //}
-
+      if(myThreadSafeData.Count>100)
+      {
+        using(StreamWriter sw = new StreamWriter("tempData.dat", true)) { foreach(Point3D ppp in myThreadSafeData) { sw.WriteLine(ppp); } }
+        myThreadSafeData=new ConcurrentBag<Point3D>();
+      }
     }
 
     /// <summary>

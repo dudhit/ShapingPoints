@@ -72,10 +72,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CurvesEventHandler.cs" />
-    <Compile Include="PointToShape.cs" />
+    <Compile Include="PointsToShape.cs" />
     <Compile Include="CoreCalculators\BresenhamCircularCurve.cs" />
     <Compile Include="CoreCalculators\BresenhamEllipticalCurve.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PointsTakeShape.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="antiTamperKey.pfx" />
